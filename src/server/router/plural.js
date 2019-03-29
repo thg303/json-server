@@ -15,13 +15,26 @@ module.exports = (db, name, opts) => {
   function embed(resource, e) {
     e &&
       [].concat(e).forEach(externalResource => {
-        if (db.get(externalResource).value) {
-          const query = {}
+        const externals = db.get(externalResource).value()
+        if (externals) {
           const singularResource = pluralize.singular(name)
-          query[`${singularResource}${opts.foreignKeySuffix}`] = resource.id
+
+          if (
+            externals[0][`${singularResource}${opts.foreignKeySuffix}`] !==
+            undefined
+          ) {
+            const query = {}
+            query[`${singularResource}${opts.foreignKeySuffix}`] = resource.id
+            return (resource[externalResource] = db
+              .get(externalResource)
+              .filter(query)
+              .value())
+          }
           resource[externalResource] = db
             .get(externalResource)
-            .filter(query)
+            .filter(item =>
+              item[`${name}${opts.foreignKeySuffix}`].includes(resource.id)
+            )
             .value()
         }
       })
@@ -34,10 +47,15 @@ module.exports = (db, name, opts) => {
         const plural = pluralize(innerResource)
         if (db.get(plural).value()) {
           const prop = `${innerResource}${opts.foreignKeySuffix}`
-          resource[innerResource] = db
-            .get(plural)
-            .getById(resource[prop])
-            .value()
+          resource[innerResource] = _.isArray(resource[prop])
+            ? db
+                .get(plural)
+                .filter(item => resource[prop].includes(item.id))
+                .value()
+            : db
+                .get(plural)
+                .getById(resource[prop])
+                .value()
         }
       })
   }

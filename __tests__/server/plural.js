@@ -18,12 +18,15 @@ describe('Server', () => {
   beforeEach(() => {
     db = {}
 
-    db.posts = [{ id: 1, body: 'foo' }, { id: 2, body: 'bar' }]
-
     db.tags = [
-      { id: 1, body: 'Technology' },
-      { id: 2, body: 'Photography' },
-      { id: 3, body: 'photo' }
+      { id: 1, body: 'Technology', refsId: ['abcd-1234'] },
+      { id: 2, body: 'Photography', refsId: ['abcd-1234'] },
+      { id: 3, body: 'photo', refsId: [] }
+    ]
+
+    db.posts = [
+      { id: 1, body: 'foo', tagsId: [1, 2, 3] },
+      { id: 2, body: 'bar', tagsId: [3] }
     ]
 
     db.users = [
@@ -53,6 +56,10 @@ describe('Server', () => {
 
     db.refs = [
       { id: 'abcd-1234', url: 'http://example.com', postId: 1, userId: 1 }
+    ]
+
+    db.reports = [
+      { id: 1, usersId: [1], refsId: ['abcd-1234'], commentsId: [3, 5] }
     ]
 
     db.stringIds = [{ id: '1234' }]
@@ -451,6 +458,63 @@ describe('Server', () => {
     })
   })
 
+  /// /// =======================================================================================================
+
+  describe('GET /:resource?_embed=', () => {
+    test('should respond with corresponding resources and array of embedded resources', () => {
+      console.warn(' her we got for taking :: /tags?_embed=posts')
+      const tags = _.cloneDeep(db.tags)
+      tags[0].posts = [db.posts[0]]
+      tags[1].posts = [db.posts[0]]
+      tags[2].posts = [db.posts[0], db.posts[1]]
+      return request(server)
+        .get('/tags?_embed=posts')
+        .expect('Content-Type', /json/)
+        .expect(tags)
+        .expect(200)
+    })
+  })
+
+  describe('GET /:resource?_embed&_embed=', () => {
+    test('should respond with corresponding resources and array of embedded resources', () => {
+      const refs = _.cloneDeep(db.refs)
+      refs[0].reports = [db.reports[0]]
+      refs[0].tags = [db.tags[0], db.tags[1]]
+      return request(server)
+        .get('/refs?_embed=reports&_embed=tags')
+        .expect('Content-Type', /json/)
+        .expect(refs)
+        .expect(200)
+    })
+  })
+
+  describe('GET /:resource/:id?_embed=', () => {
+    test('should respond with corresponding resources and array of embedded resources', () => {
+      const tag = _.cloneDeep(db.tags[0])
+      tag.posts = [db.posts[0]]
+      return request(server)
+        .get('/tags/1?_embed=posts')
+        .expect('Content-Type', /json/)
+        .expect(tag)
+        .expect(200)
+    })
+  })
+
+  describe('GET /:resource/:id?_embed=&_embed=', () => {
+    test('should respond with corresponding resource and array of embedded resources', () => {
+      const ref = _.cloneDeep(db.refs[0])
+      ref.reports = [db.reports[0]]
+      ref.tags = [db.tags[0], db.tags[1]]
+      return request(server)
+        .get('/refs/abcd-1234?_embed=reports&_embed=tags')
+        .expect('Content-Type', /json/)
+        .expect(ref)
+        .expect(200)
+    })
+  })
+
+  /// /// =======================================================================================================
+
   describe('GET /:resource?_expand=', () => {
     test('should respond with corresponding resource and expanded inner resources', () => {
       const refs = _.cloneDeep(db.refs)
@@ -500,7 +564,60 @@ describe('Server', () => {
         .expect(200)
     })
   })
+  /// //////////////////////////////////////////////////// sssssssssssssssssss
 
+  describe('GET /:resource?_expand=', () => {
+    test('should respond with corresponding resource and expanded inner as array of resources', () => {
+      const posts = _.cloneDeep(db.posts)
+      posts[0].tags = [db.tags[0], db.tags[1], db.tags[2]]
+      posts[1].tags = [db.tags[2]]
+      return request(server)
+        .get('/posts?_expand=tags')
+        .expect('Content-Type', /json/)
+        .expect(posts)
+        .expect(200)
+    })
+  })
+
+  describe('GET /:resource/:id?_expand=', () => {
+    test('should respond with corresponding resource and expanded inner as array of resources', () => {
+      const post = _.cloneDeep(db.posts[0])
+      post.tags = [db.tags[0], db.tags[1], db.tags[2]]
+      return request(server)
+        .get('/posts/1?_expand=tags')
+        .expect('Content-Type', /json/)
+        .expect(post)
+        .expect(200)
+    })
+  })
+
+  describe('GET /:resource?_expand=&_expand', () => {
+    test('should respond with corresponding resource and expanded inner as array of resources', () => {
+      const report = _.cloneDeep(db.reports)
+      report[0].refs = [db.refs[0]]
+      report[0].comments = [db.comments[2], db.comments[4]]
+      return request(server)
+        .get('/reports?_expand=refs&_expand=comments')
+        .expect('Content-Type', /json/)
+        .expect(report)
+        .expect(200)
+    })
+  })
+
+  describe('GET /:resource/:id?_expand=&_expand=', () => {
+    test('should respond with corresponding resource and expanded inner as array of resources', () => {
+      const report = db.reports[0]
+      report.refs = [db.refs[0]]
+      report.comments = [db.comments[2], db.comments[4]]
+      return request(server)
+        .get('/reports/1?_expand=refs&_expand=comments')
+        .expect('Content-Type', /json/)
+        .expect(report)
+        .expect(200)
+    })
+  })
+
+  // ////////////////////////////////////////////////////////////////////////////////
   describe('GET /:resource>_delay=', () => {
     test('should delay response', done => {
       const start = new Date()
@@ -615,7 +732,7 @@ describe('Server', () => {
   describe('PATCH /:resource/:id', () => {
     test('should respond with json and update resource', async () => {
       const partial = { body: 'bar' }
-      const post = { id: 1, body: 'bar' }
+      const post = { id: 1, body: 'bar', tagsId: [1, 2, 3] }
       const res = await request(server)
         .patch('/posts/1')
         .send(partial)
