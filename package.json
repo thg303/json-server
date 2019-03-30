@@ -1,5 +1,5 @@
 {
-  "name": "json-server",
+  "name": "@thg303/json-server",
   "version": "0.14.2",
   "description": "Serves JSON files through REST routes.",
   "main": "./lib/server/index.js",
